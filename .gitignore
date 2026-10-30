@@ -1,0 +1,4 @@
+/http-proxy
+/bin/
+/dist/
+*.test
