@@ -18,7 +18,7 @@ Copy [config.example.json](config.example.json) and edit `config.json` for your 
 cp config.example.json config.json
 ```
 
-Replace the example credentials and upstream address before use. To connect directly without an upstream, remove the `upstreams`, `defaults`, and `domain` sections.
+Replace the example credentials and upstream address before use. The proxy settings belong in the `proxy` object. To connect directly without an upstream, remove its `upstreams`, `defaults`, and `domain` sections.
 
 Start the proxy:
 
@@ -34,7 +34,7 @@ The default bind is `127.0.0.1` and the default port is `8080`. Set `--bind` and
 curl --proxy http://127.0.0.1:8080 --proxy-user alice:example-password https://example.com/
 ```
 
-Omit `auth` to accept requests without authentication. Credentials on a plain HTTP proxy connection are exposed to the network, and the server warns when authentication is enabled without HTTPS. Usernames must contain only lowercase ASCII letters and digits. Passwords must be nonempty UTF-8 strings without control characters and may contain colons. Some clients and upstream proxies may not support non-ASCII passwords.
+Omit `proxy.auth` to accept requests without authentication. Credentials on a plain HTTP proxy connection are exposed to the network, and the server warns when authentication is enabled without HTTPS. Usernames must contain only lowercase ASCII letters and digits. Passwords must be nonempty UTF-8 strings without control characters and may contain colons. Some clients and upstream proxies may not support non-ASCII passwords.
 
 ## Reverse proxy and agent
 
@@ -56,7 +56,7 @@ Start the reverse proxy and agent on their respective machines:
 ./agent run --config agent.json
 ```
 
-Configure clients to use the reverse proxy's client listener. The reverse proxy applies its routing rules first. A selected agent then applies its own routing rules, which may connect directly or use a standard HTTP proxy. The example agent connects directly. Put standard upstreams and routing rules inside its `proxy` object using the same format as [config.example.json](config.example.json). An agent does not accept independent proxy clients, so do not configure downstream `auth` in its `proxy` object.
+Configure clients to use the reverse proxy's client listener. The reverse proxy applies its routing rules first. A selected agent then applies its own routing rules, which may connect directly or use a standard HTTP proxy. The example agent connects directly. Put standard upstreams and routing rules inside its `proxy` object using the same format as the `proxy` object in [config.example.json](config.example.json). An agent does not accept independent proxy clients, so do not configure downstream `auth` or listener TLS certificates in its `proxy` object.
 
 The agent validates the reverse proxy certificate against the system trust store. For a private CA, set `agent.ca` to its PEM file. To connect through an HTTP CONNECT proxy, set `agent.proxy_url` to an HTTP proxy URL such as `http://proxy.example.net:3128`. The URL may include Basic credentials. Relative certificate and CA paths are resolved from the respective configuration file's directory. The agent listener always uses HTTPS and HTTP/2. Set `proxy.tls.cert` and `proxy.tls.key` separately if clients should use HTTPS on the client listener.
 
@@ -75,25 +75,26 @@ The agent settings `connect_timeout`, `retry_delay`, `ping_idle`, and `ping_time
 
 ## HTTPS and HTTP/2
 
-Add a `tls` section to serve HTTPS and offer HTTP/2 via TLS ALPN:
+Add a `tls` section inside `proxy` to serve HTTPS and offer HTTP/2 via TLS ALPN on the standalone proxy or reverse proxy client listener:
 
 ```json
 {
-  "tls": {
-    "cert": "server.crt",
-    "key": "server.key",
-    "upstream_ca": "upstream-ca.crt"
+  "proxy": {
+    "tls": {
+      "cert": "server.crt",
+      "key": "server.key"
+    }
   }
 }
 ```
 
-`cert` and `key` must be supplied together. Configure clients to trust the server certificate. The optional `upstream_ca` adds certificates to the system trust pool for HTTPS upstream proxies. It can be supplied without a server certificate. Relative TLS paths are resolved from the configuration file's directory. HTTPS upstream connections negotiate HTTP/2 when supported and otherwise use HTTP/1.1. Cleartext connections use HTTP/1.1.
+`cert` and `key` must be supplied together. Configure clients to trust the server certificate. The optional `proxy.tls.upstream_ca` adds certificates to the system trust pool for HTTPS upstream proxies. It can be supplied without a server certificate, including in an agent's `proxy` object. Relative TLS paths are resolved from the configuration file's directory. HTTPS upstream connections negotiate HTTP/2 when supported and otherwise use HTTP/1.1. Cleartext connections use HTTP/1.1.
 
 HTTP/2 CONNECT supports client-side half-close. If the target closes its write side first, the proxy closes the HTTP/2 tunnel instead of keeping the client-to-target side open. Use HTTP/1.1 for protocols that require the target to half-close first and continue receiving data.
 
 ## Routing
 
-Upstream `host` values are `http://` or `https://` proxy URLs. Their `auth` section is optional and uses the same Basic credential rules as downstream authentication. A selected upstream receives a CONNECT request for each target. Upstream failures return an error to the client without falling back to a direct connection.
+The routing settings below belong in the `proxy` object. For the standalone proxy and agent, upstream `host` values are `http://` or `https://` proxy URLs. Their `auth` section is optional and uses the same Basic credential rules as downstream authentication. A selected upstream receives a CONNECT request for each target. Upstream failures return an error to the client without falling back to a direct connection. Reverse proxy upstreams identify agents instead, as described above.
 
 The `defaults.ip`, `defaults.domain`, and `defaults.unqualified-domain` values name an upstream or are `null`. Omitted defaults are `null`. IP rules support IPv4 and IPv6 CIDRs and choose the longest matching prefix. Domain rules choose the most specific match. An exact name matches only that name, while `*.example.com` matches subdomains but not `example.com` itself. Matching is case-insensitive and ignores a trailing dot.
 

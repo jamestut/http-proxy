@@ -1,29 +1,31 @@
 {
-  "auth": {
-    "type": "basic",
-    "credentials": [
-      {"username": "alice", "password": "example-password"}
-    ]
-  },
-  "upstreams": {
-    "office": {
-      "host": "https://proxy.example.net:8443",
-      "auth": {
-        "type": "basic",
-        "username": "proxyuser",
-        "password": "upstream-password"
+  "proxy": {
+    "auth": {
+      "type": "basic",
+      "credentials": [
+        {"username": "alice", "password": "example-password"}
+      ]
+    },
+    "upstreams": {
+      "office": {
+        "host": "https://proxy.example.net:8443",
+        "auth": {
+          "type": "basic",
+          "username": "proxyuser",
+          "password": "upstream-password"
+        }
       }
+    },
+    "defaults": {
+      "domain": "office"
+    },
+    "ip": {
+      "10.0.0.0/8": null,
+      "fd00::/8": null
+    },
+    "domain": {
+      "*.example.com": "office",
+      "internal.example.com": null
     }
-  },
-  "defaults": {
-    "domain": "office"
-  },
-  "ip": {
-    "10.0.0.0/8": null,
-    "fd00::/8": null
-  },
-  "domain": {
-    "*.example.com": "office",
-    "internal.example.com": null
   }
 }

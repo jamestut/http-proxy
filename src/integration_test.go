@@ -44,7 +44,7 @@ func TestIntegrationTunnelSurvivesReload(t *testing.T) {
 	dir := runtimeTestDir(t)
 	path := filepath.Join(dir, "config.json")
 	config := func(password string) string {
-		return fmt.Sprintf(`{"auth":{"type":"basic","credentials":[{"username":"client","password":%q}]}}`, password)
+		return fmt.Sprintf(`{"proxy":{"auth":{"type":"basic","credentials":[{"username":"client","password":%q}]}}}`, password)
 	}
 	runtimeWrite(t, path, config("first"))
 	addr := runtimeTestAddress(t)
@@ -126,7 +126,7 @@ func TestIntegrationUpstreamCAReload(t *testing.T) {
 	}
 	path := filepath.Join(dir, "config.json")
 	writeConfig := func(ca string) {
-		runtimeWrite(t, path, fmt.Sprintf(`{"tls":{"upstream_ca":%q},"upstreams":{"u":{"host":"https://localhost:%s"}},"defaults":{"ip":"u"}}`, ca, port))
+		runtimeWrite(t, path, fmt.Sprintf(`{"proxy":{"tls":{"upstream_ca":%q},"upstreams":{"u":{"host":"https://localhost:%s"}},"defaults":{"ip":"u"}}}`, ca, port))
 	}
 	writeConfig(certPath)
 	addr := runtimeTestAddress(t)

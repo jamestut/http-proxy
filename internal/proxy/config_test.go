@@ -144,7 +144,7 @@ func TestTLSFilesRelativeToConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := addCACertificates(x509.NewCertPool(), append(certPEM, []byte("junk")...)); err == nil {
+	if err := AddCACertificates(x509.NewCertPool(), append(certPEM, []byte("junk")...)); err == nil {
 		t.Fatal("invalid trailing CA content accepted")
 	}
 	if cfg.Certificate == nil || cfg.Roots == nil {

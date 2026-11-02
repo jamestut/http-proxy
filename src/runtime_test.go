@@ -145,7 +145,7 @@ func runtimeControlPaths(t *testing.T, address string) (string, string) {
 func TestRuntimeWildcardBindAndReload(t *testing.T) {
 	dir := runtimeTestDir(t)
 	path := filepath.Join(dir, "config.json")
-	runtimeWrite(t, path, `{"auth":{"type":"basic","credentials":[{"username":"client","password":"first"}]}}`)
+	runtimeWrite(t, path, `{"proxy":{"auth":{"type":"basic","credentials":[{"username":"client","password":"first"}]}}}`)
 	ipv6, err := net.Listen("tcp6", "[::1]:0")
 	hasIPv6 := err == nil
 	if hasIPv6 {
@@ -187,7 +187,7 @@ func TestRuntimeWildcardBindAndReload(t *testing.T) {
 func TestRuntimeWildcardPortConflict(t *testing.T) {
 	dir := runtimeTestDir(t)
 	path := filepath.Join(dir, "config.json")
-	runtimeWrite(t, path, `{}`)
+	runtimeWrite(t, path, `{"proxy":{}}`)
 	occupied, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatal(err)
@@ -220,7 +220,7 @@ func TestNormalizeBindPort(t *testing.T) {
 func TestRuntimeReloadAtomicAndControlPermissions(t *testing.T) {
 	dir := runtimeTestDir(t)
 	path := filepath.Join(dir, "config.json")
-	runtimeWrite(t, path, `{}`)
+	runtimeWrite(t, path, `{"proxy":{}}`)
 	addr := runtimeTestAddress(t)
 	r := runtimeStart(t, addr, path)
 	for _, item := range []struct {
@@ -247,7 +247,7 @@ func TestRuntimeReloadAtomicAndControlPermissions(t *testing.T) {
 		t.Fatal("expected duplicate instance error")
 	}
 	old := r.current.Load()
-	runtimeWrite(t, path, `{"auth":{"type":"basic","credentials":[{"username":"newuser","password":"secret"}]}}`)
+	runtimeWrite(t, path, `{"proxy":{"auth":{"type":"basic","credentials":[{"username":"newuser","password":"secret"}]}}}`)
 	if err := runtimeReload(t, addr); err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,7 @@ func TestRuntimeReloadAtomicAndControlPermissions(t *testing.T) {
 	if active == old || active.Auth == nil || active.Auth.Credentials[0].Username != "newuser" {
 		t.Fatal("valid config not loaded")
 	}
-	runtimeWrite(t, path, `{"bad": true}`)
+	runtimeWrite(t, path, `{"proxy":{"bad": true}}`)
 	if err := runtimeReload(t, addr); err == nil {
 		t.Fatal("invalid config reload succeeded")
 	}
@@ -263,7 +263,7 @@ func TestRuntimeReloadAtomicAndControlPermissions(t *testing.T) {
 		t.Fatal("invalid reload replaced configuration")
 	}
 	cert, key := runtimeCert(t, dir, "switch")
-	runtimeWrite(t, path, fmt.Sprintf(`{"tls":{"cert":%q,"key":%q}}`, cert, key))
+	runtimeWrite(t, path, fmt.Sprintf(`{"proxy":{"tls":{"cert":%q,"key":%q}}}`, cert, key))
 	if err := runtimeReload(t, addr); err == nil || !strings.Contains(err.Error(), "restart") {
 		t.Fatalf("mode change: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestRuntimeTLSCertificateReload(t *testing.T) {
 	firstCert, firstKey := runtimeCert(t, dir, "first")
 	secondCert, secondKey := runtimeCert(t, dir, "second")
 	path := filepath.Join(dir, "config.json")
-	runtimeWrite(t, path, fmt.Sprintf(`{"tls":{"cert":%q,"key":%q}}`, firstCert, firstKey))
+	runtimeWrite(t, path, fmt.Sprintf(`{"proxy":{"tls":{"cert":%q,"key":%q}}}`, firstCert, firstKey))
 	addr := runtimeTestAddress(t)
 	r := runtimeStart(t, addr, path)
 	getCert := func() string {
@@ -296,7 +296,7 @@ func TestRuntimeTLSCertificateReload(t *testing.T) {
 	if got := getCert(); got != "first" {
 		t.Fatalf("initial cert = %s", got)
 	}
-	runtimeWrite(t, path, fmt.Sprintf(`{"tls":{"cert":%q,"key":%q}}`, secondCert, secondKey))
+	runtimeWrite(t, path, fmt.Sprintf(`{"proxy":{"tls":{"cert":%q,"key":%q}}}`, secondCert, secondKey))
 	if err := runtimeReload(t, addr); err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +306,7 @@ func TestRuntimeTLSCertificateReload(t *testing.T) {
 	if r.current.Load().Certificate == nil {
 		t.Fatal("certificate missing")
 	}
-	runtimeWrite(t, path, `{}`)
+	runtimeWrite(t, path, `{"proxy":{}}`)
 	if err := runtimeReload(t, addr); err == nil {
 		t.Fatal("removing TLS should require restart")
 	}
@@ -320,7 +320,7 @@ func TestRuntimeHTTP2ReloadOnExistingConnection(t *testing.T) {
 	cert, key := runtimeCert(t, dir, "http2")
 	path := filepath.Join(dir, "config.json")
 	writeConfig := func(password string) {
-		runtimeWrite(t, path, fmt.Sprintf(`{"tls":{"cert":%q,"key":%q},"auth":{"type":"basic","credentials":[{"username":"client","password":%q}]}}`, cert, key, password))
+		runtimeWrite(t, path, fmt.Sprintf(`{"proxy":{"tls":{"cert":%q,"key":%q},"auth":{"type":"basic","credentials":[{"username":"client","password":%q}]}}}`, cert, key, password))
 	}
 	writeConfig("first")
 	addr := runtimeTestAddress(t)

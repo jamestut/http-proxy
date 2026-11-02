@@ -118,7 +118,7 @@ func newRuntime(bind string, port int, configPath string) (_ *runtimeServer, err
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := proxy.LoadConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -188,7 +188,7 @@ func (r *runtimeServer) warnInsecure(cfg *proxy.Config) {
 func (r *runtimeServer) reload() error {
 	r.reloadMu.Lock()
 	defer r.reloadMu.Unlock()
-	cfg, err := proxy.LoadConfig(r.configPath)
+	cfg, err := loadConfig(r.configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

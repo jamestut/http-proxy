@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"http-proxy/internal/proxy"
@@ -59,14 +58,20 @@ func loadConfig(path string) (*snapshot, error) {
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
 		return nil, fmt.Errorf("agent address must be an HTTPS URL without credentials, path, query, or fragment")
 	}
-	if a.Username == "" || a.Password == "" || strings.ContainsAny(a.Username, ":\r\n") || strings.ContainsAny(a.Password, "\r\n") {
-		return nil, fmt.Errorf("agent credentials must be nonempty and valid for basic authentication")
+	if err := proxy.ValidateURLHost(u); err != nil {
+		return nil, fmt.Errorf("agent address: %w", err)
+	}
+	if err := proxy.ValidateCredential(proxy.Credential{Username: a.Username, Password: a.Password}); err != nil {
+		return nil, fmt.Errorf("agent credentials: %w", err)
 	}
 	opts := reverse.ClientOptions{Address: a.Address, Username: a.Username, Password: a.Password}
 	if a.ProxyURL != "" {
 		p, err := url.Parse(a.ProxyURL)
 		if err != nil || p.Scheme != "http" || p.Hostname() == "" || (p.Path != "" && p.Path != "/") || p.RawQuery != "" || p.ForceQuery || p.Fragment != "" || p.Opaque != "" {
 			return nil, fmt.Errorf("proxy_url must be an HTTP proxy URL without path, query, or fragment")
+		}
+		if err := proxy.ValidateURLHost(p); err != nil {
+			return nil, fmt.Errorf("proxy_url: %w", err)
 		}
 		opts.ProxyURL = p
 	}
@@ -83,8 +88,8 @@ func loadConfig(path string) (*snapshot, error) {
 		if err != nil {
 			return nil, fmt.Errorf("load system CA pool: %w", err)
 		}
-		if !roots.AppendCertsFromPEM(pem) {
-			return nil, fmt.Errorf("agent CA contains no valid certificates")
+		if err := proxy.AddCACertificates(roots, pem); err != nil {
+			return nil, fmt.Errorf("invalid agent CA file: %w", err)
 		}
 		opts.Roots = roots
 	}

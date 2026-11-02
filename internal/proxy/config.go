@@ -128,7 +128,7 @@ func parseConfig(data []byte, path string, reverse bool) (*Config, error) {
 			return nil, fmt.Errorf("auth credentials must not be empty")
 		}
 		for i, cred := range raw.Auth.Credentials {
-			if err := validateCredential(cred); err != nil {
+			if err := ValidateCredential(cred); err != nil {
 				return nil, fmt.Errorf("auth credential %d: %w", i+1, err)
 			}
 		}
@@ -167,7 +167,7 @@ func parseConfig(data []byte, path string, reverse bool) (*Config, error) {
 				return nil, fmt.Errorf("upstream %q auth type must be basic", name)
 			}
 			cred := Credential{Username: up.Auth.Username, Password: up.Auth.Password}
-			if err := validateCredential(cred); err != nil {
+			if err := ValidateCredential(cred); err != nil {
 				return nil, fmt.Errorf("upstream %q credentials: %w", name, err)
 			}
 			if reverse && credentials[cred] {
@@ -198,7 +198,7 @@ func parseConfig(data []byte, path string, reverse bool) (*Config, error) {
 			if err != nil {
 				return nil, fmt.Errorf("load system CA pool: %w", err)
 			}
-			if err := addCACertificates(pool, pem); err != nil {
+			if err := AddCACertificates(pool, pem); err != nil {
 				return nil, fmt.Errorf("invalid upstream CA file: %w", err)
 			}
 			cfg.Roots = pool
@@ -219,7 +219,8 @@ func configPath(config, path string) string {
 	return filepath.Join(filepath.Dir(config), path)
 }
 
-func validateCredential(cred Credential) error {
+// ValidateCredential applies the credential rules shared by proxy clients and agents.
+func ValidateCredential(cred Credential) error {
 	if cred.Username == "" {
 		return fmt.Errorf("username must not be empty")
 	}
@@ -247,24 +248,32 @@ func parseUpstreamURL(s string) (*url.URL, error) {
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" {
 		return nil, fmt.Errorf("host must be an HTTP or HTTPS proxy URL without credentials, path, query, or fragment")
 	}
+	if err := ValidateURLHost(u); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+// ValidateURLHost checks the address and port of a parsed URL.
+func ValidateURLHost(u *url.URL) error {
 	if strings.Contains(u.Hostname(), ":") {
 		if !strings.HasPrefix(u.Host, "[") {
-			return nil, fmt.Errorf("IPv6 upstream addresses must be bracketed")
+			return fmt.Errorf("IPv6 addresses must be bracketed")
 		}
 		if _, err := netip.ParseAddr(u.Hostname()); err != nil {
-			return nil, fmt.Errorf("invalid IPv6 upstream address")
+			return fmt.Errorf("invalid IPv6 address")
 		}
 	}
 	if strings.HasSuffix(u.Host, ":") {
-		return nil, fmt.Errorf("upstream port must not be empty")
+		return fmt.Errorf("port must not be empty")
 	}
 	if p := u.Port(); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
-			return nil, fmt.Errorf("invalid upstream port")
+			return fmt.Errorf("invalid port")
 		}
 	}
-	return u, nil
+	return nil
 }
 
 // encoding/json replaces unpaired UTF-16 escapes with U+FFFD. Reject them so
@@ -318,7 +327,8 @@ func validateJSONSurrogates(data []byte) error {
 	return nil
 }
 
-func addCACertificates(pool *x509.CertPool, data []byte) error {
+// AddCACertificates adds a PEM file containing only certificates to pool.
+func AddCACertificates(pool *x509.CertPool, data []byte) error {
 	count := 0
 	for {
 		data = bytes.TrimSpace(data)
