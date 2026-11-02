@@ -17,11 +17,18 @@ ldflags="-X main.commit=${commit} -X main.date=${date_value}"
 mkdir -p dist
 
 build() {
-  output="dist/http-proxy-$1-$3"
-  CGO_ENABLED=0 GOOS="$1" GOARCH="$2" go build -ldflags "$ldflags" -o "$output" ./src
+  output="dist/$1-$3-$5"
+  CGO_ENABLED=0 GOOS="$3" GOARCH="$4" go build -ldflags "$ldflags" -o "$output" "$2"
   printf 'built %s\n' "$output"
 }
 
-build darwin arm64 arm64
-build linux arm64 arm64
-build linux amd64 x64
+for program in http-proxy reverse-proxy agent; do
+  case "$program" in
+    http-proxy) source=./src ;;
+    reverse-proxy) source=./cmd/reverse-proxy ;;
+    agent) source=./cmd/agent ;;
+  esac
+  build "$program" "$source" darwin arm64 arm64
+  build "$program" "$source" linux arm64 arm64
+  build "$program" "$source" linux amd64 x64
+done

@@ -1,0 +1,30 @@
+{
+  "client_listen": "127.0.0.1:8080",
+  "agent_listener": {
+    "listen": "0.0.0.0:8443",
+    "cert": "agent-server.crt",
+    "key": "agent-server.key"
+  },
+  "proxy": {
+    "auth": {
+      "type": "basic",
+      "credentials": [
+        {"username": "alice", "password": "example-client-password"}
+      ]
+    },
+    "upstreams": {
+      "remote": {
+        "auth": {
+          "type": "basic",
+          "username": "remote",
+          "password": "example-agent-password"
+        }
+      }
+    },
+    "defaults": {
+      "ip": "remote",
+      "domain": "remote",
+      "unqualified-domain": "remote"
+    }
+  }
+}

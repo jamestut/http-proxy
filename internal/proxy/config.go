@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"bytes"
@@ -49,7 +49,7 @@ type rawUpstreamAuth struct {
 }
 
 type rawUpstream struct {
-	Host string           `json:"host"`
+	Host json.RawMessage  `json:"host"`
 	Auth *rawUpstreamAuth `json:"auth"`
 }
 
@@ -75,10 +75,30 @@ type rawConfig struct {
 }
 
 func LoadConfig(path string) (*Config, error) {
+	return loadConfig(path, false)
+}
+
+func LoadReverseConfig(path string) (*Config, error) {
+	return loadConfig(path, true)
+}
+
+func loadConfig(path string, reverse bool) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
+	return parseConfig(data, path, reverse)
+}
+
+func ParseConfig(data []byte, path string) (*Config, error) {
+	return parseConfig(data, path, false)
+}
+
+func ParseReverseConfig(data []byte, path string) (*Config, error) {
+	return parseConfig(data, path, true)
+}
+
+func parseConfig(data []byte, path string, reverse bool) (*Config, error) {
 	if !utf8.Valid(data) {
 		return nil, fmt.Errorf("config is not valid UTF-8")
 	}
@@ -113,6 +133,7 @@ func LoadConfig(path string) (*Config, error) {
 			}
 		}
 	}
+	credentials := make(map[Credential]bool)
 	for name, up := range raw.Upstreams {
 		if strings.TrimSpace(name) != name || name == "" {
 			return nil, fmt.Errorf("invalid upstream name %q", name)
@@ -120,11 +141,27 @@ func LoadConfig(path string) (*Config, error) {
 		if up == nil {
 			return nil, fmt.Errorf("upstream %q must be an object", name)
 		}
-		u, err := parseUpstreamURL(up.Host)
-		if err != nil {
-			return nil, fmt.Errorf("upstream %q: %w", name, err)
+		compiled := &Upstream{}
+		if reverse {
+			if up.Host != nil {
+				return nil, fmt.Errorf("upstream %q must not have a host", name)
+			}
+			if up.Auth == nil {
+				return nil, fmt.Errorf("upstream %q requires authentication", name)
+			}
+		} else {
+			var host string
+			if up.Host != nil {
+				if err := json.Unmarshal(up.Host, &host); err != nil {
+					return nil, fmt.Errorf("upstream %q: invalid host", name)
+				}
+			}
+			u, err := parseUpstreamURL(host)
+			if err != nil {
+				return nil, fmt.Errorf("upstream %q: %w", name, err)
+			}
+			compiled.URL = u
 		}
-		compiled := &Upstream{URL: u}
 		if up.Auth != nil {
 			if up.Auth.Type != "basic" {
 				return nil, fmt.Errorf("upstream %q auth type must be basic", name)
@@ -133,6 +170,10 @@ func LoadConfig(path string) (*Config, error) {
 			if err := validateCredential(cred); err != nil {
 				return nil, fmt.Errorf("upstream %q credentials: %w", name, err)
 			}
+			if reverse && credentials[cred] {
+				return nil, fmt.Errorf("duplicate upstream credentials")
+			}
+			credentials[cred] = true
 			compiled.Auth = &cred
 		}
 		cfg.Upstreams[name] = compiled

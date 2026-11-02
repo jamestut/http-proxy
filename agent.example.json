@@ -1,0 +1,8 @@
+{
+  "agent": {
+    "address": "https://proxy.example.net:8443",
+    "username": "remote",
+    "password": "example-agent-password"
+  },
+  "proxy": {}
+}

@@ -18,10 +18,12 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"http-proxy/internal/proxy"
 )
 
 type runtimeServer struct {
-	current     atomic.Pointer[Config]
+	current     atomic.Pointer[proxy.Config]
 	configPath  string
 	listener    net.Listener
 	control     net.Listener
@@ -116,7 +118,7 @@ func newRuntime(bind string, port int, configPath string) (_ *runtimeServer, err
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := LoadConfig(configPath)
+	cfg, err := proxy.LoadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -164,7 +166,7 @@ func newRuntime(bind string, port int, configPath string) (_ *runtimeServer, err
 	}
 	r := &runtimeServer{configPath: configPath, listener: listener, control: control, controlPath: socket, lock: lock}
 	r.current.Store(cfg)
-	r.http = &http.Server{Handler: NewProxyHandler(&r.current), ReadHeaderTimeout: 10 * time.Second}
+	r.http = &http.Server{Handler: proxy.NewProxyHandler(&r.current), ReadHeaderTimeout: 10 * time.Second}
 	if cfg.Certificate != nil {
 		r.http.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
@@ -177,7 +179,7 @@ func newRuntime(bind string, port int, configPath string) (_ *runtimeServer, err
 	return r, nil
 }
 
-func (r *runtimeServer) warnInsecure(cfg *Config) {
+func (r *runtimeServer) warnInsecure(cfg *proxy.Config) {
 	if cfg.Auth != nil && cfg.Certificate == nil {
 		log.Print("warning: proxy authentication is enabled on a plain HTTP listener")
 	}
@@ -186,7 +188,7 @@ func (r *runtimeServer) warnInsecure(cfg *Config) {
 func (r *runtimeServer) reload() error {
 	r.reloadMu.Lock()
 	defer r.reloadMu.Unlock()
-	cfg, err := LoadConfig(r.configPath)
+	cfg, err := proxy.LoadConfig(r.configPath)
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

@@ -2,6 +2,8 @@
 
 HTTP Proxy forwards HTTP requests and TCP CONNECT tunnels directly or through named HTTP proxies. Destination rules select the route. HTTPS proxy connections can use HTTP/2 and multiplex tunnels over one connection.
 
+The repository also provides `reverse-proxy` and `agent` for networks where the upstream side must initiate the connection. The reverse proxy accepts normal proxy clients, and an agent connects to it and routes traffic using the same rules as the standard proxy.
+
 ## Get started
 
 Go 1.26 or later is required. Build the program on macOS or Linux:
@@ -33,6 +35,43 @@ curl --proxy http://127.0.0.1:8080 --proxy-user alice:example-password https://e
 ```
 
 Omit `auth` to accept requests without authentication. Credentials on a plain HTTP proxy connection are exposed to the network, and the server warns when authentication is enabled without HTTPS. Usernames must contain only lowercase ASCII letters and digits. Passwords must be nonempty UTF-8 strings without control characters and may contain colons. Some clients and upstream proxies may not support non-ASCII passwords.
+
+## Reverse proxy and agent
+
+Build the other programs and prepare their configuration:
+
+```sh
+go build -o reverse-proxy ./cmd/reverse-proxy
+go build -o agent ./cmd/agent
+cp reverse-proxy.example.json reverse-proxy.json
+cp agent.example.json agent.json
+```
+
+Configure `agent_listener.cert` and `agent_listener.key` with a certificate and key for the address the agent uses. Replace the example passwords and `agent.address`, and make the agent credentials match one of the reverse proxy's named upstreams. The example binds the agent listener to all interfaces. Choose a reachable address for your network. Set `client_listen` independently for normal proxy clients.
+
+Start the reverse proxy and agent on their respective machines:
+
+```sh
+./reverse-proxy run --config reverse-proxy.json
+./agent run --config agent.json
+```
+
+Configure clients to use the reverse proxy's client listener. The reverse proxy applies its routing rules first. A selected agent then applies its own routing rules, which may connect directly or use a standard HTTP proxy. The example agent connects directly. Put standard upstreams and routing rules inside its `proxy` object using the same format as [config.example.json](config.example.json). An agent does not accept independent proxy clients, so do not configure downstream `auth` in its `proxy` object.
+
+The agent validates the reverse proxy certificate against the system trust store. For a private CA, set `agent.ca` to its PEM file. To connect through an HTTP CONNECT proxy, set `agent.proxy_url` to an HTTP proxy URL such as `http://proxy.example.net:3128`. The URL may include Basic credentials. Relative certificate and CA paths are resolved from the respective configuration file's directory. The agent listener always uses HTTPS and HTTP/2. Set `proxy.tls.cert` and `proxy.tls.key` separately if clients should use HTTPS on the client listener.
+
+Each reverse upstream requires unique Basic credentials and does not have a `host` field. An agent authenticates with those credentials when it connects. Only one agent is active per upstream. A newly authenticated agent replaces the old one and asks it to exit, ending its active tunnels. Run the agent under a service manager configured to restart it after a crash or kill, but not after a successful exit. A selected upstream that has no agent fails the request without falling back to a direct connection.
+
+Reload the reverse proxy or agent using the same configuration path used to start it:
+
+```sh
+./reverse-proxy reload --config reverse-proxy.json
+./agent reload --config agent.json
+```
+
+Changing agent credentials on the reverse proxy does not disconnect a healthy agent. The agent must use the new credentials when it reconnects. Removing an upstream asks its agent to exit. Agent routing changes apply to new requests, while changes to its connection settings apply at the next reconnect. Existing tunnels retain their routing settings. Changing listener addresses or switching the client listener between HTTP and HTTPS requires restarting the reverse proxy. Updated certificates apply to new TLS connections.
+
+The agent settings `connect_timeout`, `retry_delay`, `ping_idle`, and `ping_timeout` accept Go duration strings such as `5s`. Their defaults are `30s`, `5s`, `30s`, and `15s`. The reverse proxy's `agent_listener` accepts `ping_idle`, `ping_timeout`, and `shutdown_timeout`, with defaults of `30s`, `15s`, and `5s`. Health check changes apply to new agent connections. The shutdown timeout limits how long the proxy waits for a replaced or removed agent to close its connection.
 
 ## HTTPS and HTTP/2
 
@@ -74,13 +113,13 @@ The per-user control socket and instance lock live under `$XDG_RUNTIME_DIR/http-
 
 ## Development
 
-Build release binaries for macOS ARM64, Linux ARM64, and Linux x64 with:
+Build all three programs for macOS ARM64, Linux ARM64, and Linux x64 with:
 
 ```sh
 ./build.sh
 ```
 
-The script writes the binaries to `dist/` and disables CGO for cross-compilation. These binaries use Go's DNS resolver, which can differ from the system resolver on some networks.
+The script writes nine binaries to `dist/` and disables CGO for cross-compilation. These binaries use Go's DNS resolver, which can differ from the system resolver on some networks.
 
 The build script embeds the current tag or commit and the build time. A regular `go build` reports `dev` and an unknown build time, while Go's source metadata is available when the build environment supports it.
 

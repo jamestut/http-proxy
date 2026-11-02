@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"bufio"
@@ -25,6 +25,7 @@ import (
 // proxyHandler holds upstream HTTP/2 connections for the currently active snapshot.
 type proxyHandler struct {
 	current *atomic.Pointer[Config]
+	dial    func(context.Context, string, string) (net.Conn, error)
 	mu      sync.Mutex
 	config  *Config
 	pools   map[string]*upstreamPool
@@ -37,6 +38,10 @@ type upstreamPool struct {
 
 func NewProxyHandler(current *atomic.Pointer[Config]) http.Handler {
 	return &proxyHandler{current: current}
+}
+
+func NewReverseProxyHandler(current *atomic.Pointer[Config], dial func(context.Context, string, string) (net.Conn, error)) http.Handler {
+	return &proxyHandler{current: current, dial: dial}
 }
 
 func (p *proxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +282,9 @@ func (p *proxyHandler) dialRoute(ctx context.Context, cfg *Config, route *string
 	up := cfg.Upstreams[*route]
 	if up == nil {
 		return nil, errors.New("unknown upstream")
+	}
+	if p.dial != nil {
+		return p.dial(ctx, *route, target)
 	}
 	return p.dialUpstream(ctx, cfg, *route, up, target)
 }
