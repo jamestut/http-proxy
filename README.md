@@ -12,10 +12,10 @@ Go 1.26 or later is required. Build the program on macOS or Linux:
 go build -o http-proxy ./src
 ```
 
-Copy [config.example.json](config.example.json) and edit `config.json` for your setup:
+Copy [examples/config.example.json](examples/config.example.json) and edit `config.json` for your setup:
 
 ```sh
-cp config.example.json config.json
+cp examples/config.example.json config.json
 ```
 
 Replace the example credentials and upstream address before use. The proxy settings belong in the `proxy` object. To connect directly without an upstream, remove its `upstreams`, `defaults`, and `domain` sections.
@@ -43,8 +43,8 @@ Build the other programs and prepare their configuration:
 ```sh
 go build -o reverse-proxy ./cmd/reverse-proxy
 go build -o agent ./cmd/agent
-cp reverse-proxy.example.json reverse-proxy.json
-cp agent.example.json agent.json
+cp examples/reverse-proxy.example.json reverse-proxy.json
+cp examples/agent.example.json agent.json
 ```
 
 Configure `agent_listener.cert` and `agent_listener.key` with a certificate and key for the address the agent uses. Replace the example passwords and `agent.address`, and make the agent credentials match one of the reverse proxy's named upstreams. The example binds the agent listener to all interfaces. Choose a reachable address for your network. Set `client_listen` independently for normal proxy clients.
@@ -56,7 +56,7 @@ Start the reverse proxy and agent on their respective machines:
 ./agent run --config agent.json
 ```
 
-Configure clients to use the reverse proxy's client listener. The reverse proxy applies its routing rules first. A selected agent then applies its own routing rules, which may connect directly or use a standard HTTP proxy. The example agent connects directly. Put standard upstreams and routing rules inside its `proxy` object using the same format as the `proxy` object in [config.example.json](config.example.json). An agent does not accept independent proxy clients, so do not configure downstream `auth` or listener TLS certificates in its `proxy` object.
+Configure clients to use the reverse proxy's client listener. The reverse proxy applies its routing rules first. A selected agent then applies its own routing rules, which may connect directly or use a standard HTTP proxy. The example agent connects directly. Put standard upstreams and routing rules inside its `proxy` object using the same format as the `proxy` object in [examples/config.example.json](examples/config.example.json). An agent does not accept independent proxy clients, so do not configure downstream `auth` or listener TLS certificates in its `proxy` object.
 
 The agent validates the reverse proxy certificate against the system trust store. For a private CA, set `agent.ca` to its PEM file. To connect through an HTTP CONNECT proxy, set `agent.proxy_url` to an HTTP proxy URL such as `http://proxy.example.net:3128`. The URL may include Basic credentials. Relative certificate and CA paths are resolved from the respective configuration file's directory. The agent listener always uses HTTPS and HTTP/2. Set `proxy.tls.cert` and `proxy.tls.key` separately if clients should use HTTPS on the client listener.
 
