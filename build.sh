@@ -3,6 +3,23 @@ set -eu
 
 cd "$(dirname "$0")"
 
+archive=0
+case "$#" in
+  0) ;;
+  1)
+    if [ "$1" = "--archive" ]; then
+      archive=1
+    else
+      printf 'usage: %s [--archive]\n' "$0" >&2
+      exit 2
+    fi
+    ;;
+  *)
+    printf 'usage: %s [--archive]\n' "$0" >&2
+    exit 2
+    ;;
+esac
+
 commit=unknown
 date_value=$(date +%Y-%m-%dT%H:%M:%S%z)
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -19,6 +36,10 @@ mkdir -p dist
 build() {
   output="dist/$1-$3-$5"
   CGO_ENABLED=0 GOOS="$3" GOARCH="$4" go build -ldflags "$ldflags" -o "$output" "$2"
+  if [ "$archive" -eq 1 ]; then
+    xz -8 -T0 "$output"
+    output="$output.xz"
+  fi
   printf 'built %s\n' "$output"
 }
 

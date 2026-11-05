@@ -122,7 +122,7 @@ Build all three programs for macOS ARM64, Linux ARM64, and Linux x64 with:
 ./build.sh
 ```
 
-The script writes nine binaries to `dist/` and disables CGO for cross-compilation. These binaries use Go's DNS resolver, which can differ from the system resolver on some networks.
+The script writes the binaries under `dist/` folder, and disables CGO for cross-compilation. These binaries use Go's DNS resolver, which can differ from the system resolver on some networks.
 
 The build script embeds the current tag or commit and the build time. A regular `go build` reports `dev` and an unknown build time, while Go's source metadata is available when the build environment supports it.
 
