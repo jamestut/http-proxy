@@ -87,11 +87,21 @@ func proxyAuthorized(r *http.Request, auth *AuthConfig) bool {
 }
 
 func (p *proxyHandler) serveHTTP(w http.ResponseWriter, r *http.Request, cfg *Config) {
-	if r.URL == nil || r.URL.Scheme != "http" || r.URL.Host == "" {
+	if r.URL == nil {
 		http.Error(w, "expected an absolute HTTP URL", http.StatusBadRequest)
 		return
 	}
-	target, err := clientDestination(r.URL.Host, "80")
+	out := r.Clone(r.Context())
+	if out.URL.Scheme == "" && out.URL.Host == "" && strings.HasPrefix(out.URL.Path, "/") {
+		// Go does not expose the HTTP/2 target scheme, so path-form requests use HTTP.
+		out.URL.Scheme = "http"
+		out.URL.Host = r.Host
+	}
+	if out.URL.Scheme != "http" || out.URL.Host == "" {
+		http.Error(w, "expected an absolute HTTP URL", http.StatusBadRequest)
+		return
+	}
+	target, err := clientDestination(out.URL.Host, "80")
 	if err != nil {
 		http.Error(w, "invalid destination", http.StatusBadRequest)
 		return
@@ -104,7 +114,6 @@ func (p *proxyHandler) serveHTTP(w http.ResponseWriter, r *http.Request, cfg *Co
 		},
 	}
 	defer transport.CloseIdleConnections()
-	out := r.Clone(r.Context())
 	out.RequestURI = ""
 	out.Header = r.Header.Clone()
 	stripHopHeaders(out.Header)
