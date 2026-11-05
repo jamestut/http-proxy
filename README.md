@@ -98,6 +98,8 @@ The routing settings below belong in the `proxy` object. For the standalone prox
 
 The `defaults.ip`, `defaults.domain`, and `defaults.unqualified-domain` values name an upstream or are `null`. Omitted defaults are `null`. IP rules support IPv4 and IPv6 CIDRs and choose the longest matching prefix. Domain rules choose the most specific match. An exact name matches only that name, while `*.example.com` matches subdomains but not `example.com` itself. Matching is case-insensitive and ignores a trailing dot.
 
+Scoped IPv6 destinations, such as `fe80::1%eth0`, are not supported in client requests.
+
 For an IP destination, `null` means connect directly. For a domain destination, `null` means resolve it locally and apply the IP rules and IP default to the results. A selected domain upstream receives the hostname without local resolution. An unqualified domain is a name without a dot, such as `localhost`.
 
 ## Reload configuration

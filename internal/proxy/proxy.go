@@ -91,7 +91,7 @@ func (p *proxyHandler) serveHTTP(w http.ResponseWriter, r *http.Request, cfg *Co
 		http.Error(w, "expected an absolute HTTP URL", http.StatusBadRequest)
 		return
 	}
-	target, err := destination(r.URL.Host, "80")
+	target, err := clientDestination(r.URL.Host, "80")
 	if err != nil {
 		http.Error(w, "invalid destination", http.StatusBadRequest)
 		return
@@ -139,7 +139,7 @@ func stripHopHeaders(h http.Header) {
 }
 
 func (p *proxyHandler) serveConnect(w http.ResponseWriter, r *http.Request, cfg *Config) {
-	target, err := destination(r.Host, "")
+	target, err := clientDestination(r.Host, "")
 	if err != nil {
 		http.Error(w, "invalid destination", http.StatusBadRequest)
 		return
@@ -220,6 +220,18 @@ func relay(ctx context.Context, upstream net.Conn, downstream io.Closer, fromCli
 	<-done
 	_ = downstream.Close()
 	_ = upstream.Close()
+}
+
+func clientDestination(authority, defaultPort string) (string, error) {
+	target, err := destination(authority, defaultPort)
+	if err != nil {
+		return "", err
+	}
+	host, _, _ := net.SplitHostPort(target)
+	if strings.Contains(host, ":") && strings.Contains(host, "%") {
+		return "", errors.New("scoped IPv6 destinations are not supported")
+	}
+	return target, nil
 }
 
 func destination(authority, defaultPort string) (string, error) {
